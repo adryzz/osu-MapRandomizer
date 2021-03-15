@@ -17,7 +17,7 @@ namespace osu_MapRandomizer
 {
     public partial class Form1 : Form
     {
-        Dictionary<DirectoryInfo, Beatmap> LoadedMaps = new Dictionary<DirectoryInfo, Beatmap>();
+        List<FileInfo> LoadedMaps = new List<FileInfo>();
 
         public Form1()
         {
@@ -49,43 +49,15 @@ namespace osu_MapRandomizer
                     bmaps.Add(beatmapInfo);
                 }
             }
-            List<FileInfo> fmaps = new List<FileInfo>();
             foreach(DirectoryInfo info in bmaps)
             {
                 foreach(FileInfo i in info.EnumerateFiles("*.osu", SearchOption.TopDirectoryOnly))
                 {
-                    fmaps.Add(i);
+                    LoadedMaps.Add(i);
                 }
             }
-            Log($"Found {dirs.Count} directories and {fmaps.Count} beatmaps.");
-            progressBar1.Maximum = fmaps.Count;
-            label2.Text = $"0/{fmaps.Count} maps loaded.";
-            new Thread(new ThreadStart(() =>
-            {
-                for (int i = 0; i < fmaps.Count; i++)
-                {
-
-                    Beatmap map = BeatmapDecoder.Decode(fmaps[i].FullName);
-                    if (map != null)
-                    {
-                        LoadedMaps.Add(new DirectoryInfo(Path.GetDirectoryName(fmaps[i].FullName)), map);
-                    }
-                    else
-                    {
-                        Log($"{fmaps[i].Name} couldn't be loaded.");
-                    }
-                    Invoke(new UIUpdateDelegate(() =>
-                    {
-                        label2.Text = $"{i + 1}/{fmaps.Count} maps loaded.";
-                        progressBar1.Value = i + 1;
-                        if (i + 1 == fmaps.Count)
-                        {
-                            button1.Enabled = true;
-                            button2.Enabled = true;
-                        }
-                    }));
-                }
-            })).Start();
+            Log($"Found {dirs.Count} directories and {LoadedMaps.Count} beatmaps.");
+            button2.Enabled = true;
         }
         delegate void UIUpdateDelegate();
 
@@ -131,25 +103,32 @@ namespace osu_MapRandomizer
 
         void RandomizeBeatmap()
         {
+            Directory.Delete("RandomizedMap", true);
             Random r = new Random();
             var kmap = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
             var ksong = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
+            Beatmap map = BeatmapDecoder.Decode(kmap.FullName);
+            Beatmap song = BeatmapDecoder.Decode(kmap.FullName);
 
-            while (kmap.Value.GeneralSection.Mode != ksong.Value.GeneralSection.Mode)
+            while (map.GeneralSection.Mode != song.GeneralSection.Mode)
             {
                 kmap = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
                 ksong = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
             }
 
-            kmap.Value.TimingPoints = ksong.Value.TimingPoints;
-            kmap.Value.GeneralSection.AudioFilename = ksong.Value.GeneralSection.AudioFilename;
-            kmap.Value.GeneralSection.Length = ksong.Value.GeneralSection.Length;
-            kmap.Value.MetadataSection.Artist =  "osu!map randomizer";
-            kmap.Value.MetadataSection.Title = "Randomized map";
-            kmap.Value.MetadataSection.Creator = "osu!map randomizer";
+            map.TimingPoints = song.TimingPoints;
+            map.GeneralSection.AudioFilename = song.GeneralSection.AudioFilename;
+            map.GeneralSection.Length = song.GeneralSection.Length;
+            map.MetadataSection.Artist =  "osu!map randomizer";
+            map.MetadataSection.Title = "Randomized map";
+            map.MetadataSection.Creator = "osu!map randomizer";
+            //create map directory
             Directory.CreateDirectory("RandomizedMap");
-            File.Copy(Path.Combine(ksong.Key.FullName, ksong.Value.GeneralSection.AudioFilename), Path.Combine("RandomizedMap", ksong.Value.GeneralSection.AudioFilename));
-            kmap.Value.Save(Path.Combine("RandomizedMap", "map.osu"));
+            //copy audio file
+            File.Copy(Path.Combine(Path.GetDirectoryName(ksong.FullName), song.GeneralSection.AudioFilename), Path.Combine("RandomizedMap", song.GeneralSection.AudioFilename));
+            //copy background
+            File.Copy(Path.Combine(Path.GetDirectoryName(kmap.FullName), song.EventsSection.BackgroundImage), Path.Combine("RandomizedMap", song.EventsSection.BackgroundImage));
+            map.Save(Path.Combine("RandomizedMap", "map.osu"));
         }
     }
 }
