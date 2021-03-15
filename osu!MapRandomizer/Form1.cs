@@ -27,7 +27,7 @@ namespace osu_MapRandomizer
 
         private void Form1_Load(object sender, EventArgs e)
         {
-
+            checkedListBox1.SetItemChecked(0, true);
         }
 
         private void textBox1_TextChanged(object sender, EventArgs e)
@@ -64,10 +64,9 @@ namespace osu_MapRandomizer
 
         private void button2_Click(object sender, EventArgs e)
         {
-            RandomizeBeatmap();
             try
             {
-                
+                RandomizeBeatmap();
             }
             catch
             {
@@ -128,10 +127,20 @@ namespace osu_MapRandomizer
             Beatmap map = BeatmapDecoder.Decode(kmap.FullName);
             Beatmap song = BeatmapDecoder.Decode(kmap.FullName);
 
-            while (map.GeneralSection.Mode != song.GeneralSection.Mode)
+            while (map.GeneralSection.Mode != song.GeneralSection.Mode && (!checkedListBox1.GetItemChecked(0) && (int)map.BeatLengthAt(0) == (int)song.BeatLengthAt(0)))
             {
                 kmap = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
                 ksong = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
+                map = BeatmapDecoder.Decode(kmap.FullName);
+                song = BeatmapDecoder.Decode(kmap.FullName);
+            }
+
+            while (map.GeneralSection.Mode != song.GeneralSection.Mode && checkedListBox1.GetItemChecked(0))
+            {
+                kmap = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
+                ksong = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
+                map = BeatmapDecoder.Decode(kmap.FullName);
+                song = BeatmapDecoder.Decode(kmap.FullName);
             }
             //create map directory
             Directory.CreateDirectory("RandomizedMap");
@@ -201,7 +210,6 @@ namespace osu_MapRandomizer
             map.MetadataSection.Artist =  "osu!map randomizer";
             map.MetadataSection.Title = "Randomized map";
             map.MetadataSection.Creator = "osu!map randomizer";
-     
             //copy background
             File.Copy(Path.Combine(Path.GetDirectoryName(kmap.FullName), song.EventsSection.BackgroundImage), Path.Combine("RandomizedMap", song.EventsSection.BackgroundImage));
             map.Save(Path.Combine("RandomizedMap", "map.osu"));

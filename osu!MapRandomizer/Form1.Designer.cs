@@ -76,7 +76,7 @@ namespace osu_MapRandomizer
             this.checkedListBox1.FormattingEnabled = true;
             this.checkedListBox1.Items.AddRange(new object[] {
             "Mix different BPMs",
-            "Random hitsounds",
+            "Use correct timing",
             "Random video",
             "Random storyboard",
             "Random CS",
@@ -175,6 +175,9 @@ namespace osu_MapRandomizer
             this.Controls.Add(this.button1);
             this.Controls.Add(this.textBox1);
             this.Controls.Add(this.label1);
+            this.MaximizeBox = false;
+            this.MaximumSize = new System.Drawing.Size(486, 456);
+            this.MinimumSize = new System.Drawing.Size(486, 456);
             this.Name = "Form1";
             this.Text = "osu! map randomizer";
             this.Load += new System.EventHandler(this.Form1_Load);
