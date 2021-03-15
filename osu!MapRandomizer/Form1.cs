@@ -10,12 +10,14 @@ using System.Windows.Forms;
 using System.IO;
 using System.Diagnostics;
 using System.Threading;
+using OsuParsers.Beatmaps;
+using OsuParsers.Decoders;
 
 namespace osu_MapRandomizer
 {
     public partial class Form1 : Form
     {
-        List<Beatmap> LoadedMaps = new List<Beatmap>();
+        Dictionary<DirectoryInfo, Beatmap> LoadedMaps = new Dictionary<DirectoryInfo, Beatmap>();
 
         public Form1()
         {
@@ -38,37 +40,45 @@ namespace osu_MapRandomizer
             button2.Enabled = false;
             button1.Enabled = false;
             List<string> dirs = Directory.EnumerateDirectories(Path.GetFullPath(textBox1.Text)).ToList();
-            List<DirectoryInfo> maps = new List<DirectoryInfo>();
+            List<DirectoryInfo> bmaps = new List<DirectoryInfo>();
             foreach (string s in dirs)
             {
                 DirectoryInfo beatmapInfo = new DirectoryInfo(s);
                 if (char.IsDigit(beatmapInfo.Name[0])) //beatmaps start with the beatmap ID first, that is a number
                 {
-                    maps.Add(beatmapInfo);
+                    bmaps.Add(beatmapInfo);
                 }
             }
-            Log($"Found {dirs.Count} directories and {maps.Count} beatmaps.");
-            progressBar1.Maximum = maps.Count;
-            label2.Text = $"0/{maps.Count} maps loaded.";
+            List<FileInfo> fmaps = new List<FileInfo>();
+            foreach(DirectoryInfo info in bmaps)
+            {
+                foreach(FileInfo i in info.EnumerateFiles("*.osu", SearchOption.TopDirectoryOnly))
+                {
+                    fmaps.Add(i);
+                }
+            }
+            Log($"Found {dirs.Count} directories and {fmaps.Count} beatmaps.");
+            progressBar1.Maximum = fmaps.Count;
+            label2.Text = $"0/{fmaps.Count} maps loaded.";
             new Thread(new ThreadStart(() =>
             {
-                for (int i = 0; i < maps.Count; i++)
+                for (int i = 0; i < fmaps.Count; i++)
                 {
-                    DirectoryInfo info = maps[i];
-                    Beatmap map = BeatmapLoader.LoadBeatmap(info);
+
+                    Beatmap map = BeatmapDecoder.Decode(fmaps[i].FullName);
                     if (map != null)
                     {
-                        LoadedMaps.Add(map);
+                        LoadedMaps.Add(new DirectoryInfo(Path.GetDirectoryName(fmaps[i].FullName)), map);
                     }
                     else
                     {
-                        Log($"{info.Name} couldn't be loaded.");
+                        Log($"{fmaps[i].Name} couldn't be loaded.");
                     }
                     Invoke(new UIUpdateDelegate(() =>
                     {
-                        label2.Text = $"{i + 1}/{maps.Count} maps loaded.";
+                        label2.Text = $"{i + 1}/{fmaps.Count} maps loaded.";
                         progressBar1.Value = i + 1;
-                        if (i + 1 == maps.Count)
+                        if (i + 1 == fmaps.Count)
                         {
                             button1.Enabled = true;
                             button2.Enabled = true;
@@ -81,8 +91,7 @@ namespace osu_MapRandomizer
 
         private void button2_Click(object sender, EventArgs e)
         {
-            Beatmap map = RandomizeBeatmap();
-            map.Export();
+            RandomizeBeatmap();
         }
 
         void Log(string text)
@@ -120,27 +129,27 @@ namespace osu_MapRandomizer
             Process.Start("https://github.com/realTobby/OsuSkinRandomizer");
         }
 
-        Beatmap RandomizeBeatmap()
+        void RandomizeBeatmap()
         {
             Random r = new Random();
-            BeatmapDifficulty map = LoadedMaps[r.Next(0, LoadedMaps.Count)].Difficulties[0];
-            Console.WriteLine(map.Artist + " - " + map.TitleUnicode);
-            Beatmap song = LoadedMaps[r.Next(0, LoadedMaps.Count)];
-            Console.WriteLine(song.Difficulties[0].Artist + " - " + song.Difficulties[0].TitleUnicode);
-            map.Song = song.Difficulties[0].Song;
-            map.Title = "Randomized song";
-            map.TitleUnicode = "Randomized song";
-            map.Artist = "osu! map randomizer";
-            map.ArtistUnicode = "osu! map randomizer";
-            map.Creator = "Adryzz";
-            map.Version = "Random";
-            map.Source = "osu! map randomizer";
-            map.Tags = "Random";
-            map.BeatmapID = 9999999;
-            map.BeatmapSetID = 7777777;
-            Beatmap end = new Beatmap();
-            end.Difficulties.Add(map);
-            return end;
+            var kmap = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
+            var ksong = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
+
+            while (kmap.Value.GeneralSection.Mode != ksong.Value.GeneralSection.Mode)
+            {
+                kmap = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
+                ksong = LoadedMaps.ElementAt(r.Next(0, LoadedMaps.Count));
+            }
+
+            kmap.Value.TimingPoints = ksong.Value.TimingPoints;
+            kmap.Value.GeneralSection.AudioFilename = ksong.Value.GeneralSection.AudioFilename;
+            kmap.Value.GeneralSection.Length = ksong.Value.GeneralSection.Length;
+            kmap.Value.MetadataSection.Artist =  "osu!map randomizer";
+            kmap.Value.MetadataSection.Title = "Randomized map";
+            kmap.Value.MetadataSection.Creator = "osu!map randomizer";
+            Directory.CreateDirectory("RandomizedMap");
+            File.Copy(Path.Combine(ksong.Key.FullName, ksong.Value.GeneralSection.AudioFilename), Path.Combine("RandomizedMap", ksong.Value.GeneralSection.AudioFilename));
+            kmap.Value.Save(Path.Combine("RandomizedMap", "map.osu"));
         }
     }
 }
